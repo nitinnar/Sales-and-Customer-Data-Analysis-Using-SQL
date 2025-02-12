@@ -1,0 +1,104 @@
+## 1.	Remove duplicate customer records.
+
+DELETE FROM CUSTOMER_DATA
+WHERE CUSTOMER_ID NOT IN (
+    SELECT MIN(CUSTOMER_ID)
+    FROM CUSTOMER_DATA
+    GROUP BY CUSTOMER_ID, GENDER, AGE, PAYMENT_METHOD
+);
+
+## 2.	Handle NULL values in sales and customer data.
+
+# To check for any null values.
+SELECT * FROM SALES_DATA_1
+WHERE PRICE IS NULL;
+
+
+# To update the null values with 0.
+UPDATE SALES_DATA_1
+SET PRICE = 0
+WHERE PRICE IS NULL;
+
+## 3. Customer segmentation based on total spending.
+
+WITH CustomerSpending AS (
+    SELECT 
+        Customer_ID, 
+        SUM(QUANTITY*PRICE) AS TotalSpent
+    FROM SALES_DATA_1
+    GROUP BY Customer_ID
+)
+SELECT  
+    Customer_ID, 
+    TotalSpent,
+    CASE 
+        WHEN TotalSpent > 1000 THEN 'Premium'
+        WHEN TotalSpent BETWEEN 500 AND 1000 THEN 'Standard'
+        ELSE 'Basic'
+    END AS Segment
+FROM CustomerSpending;
+
+## 4.	Monthly sales trends by region.
+
+SELECT 
+    EXTRACT(MONTH FROM TO_DATE(INVOICE_DATE, 'DD/MM/YYYY')) AS Month, 
+    SUM(QUANTITY * PRICE) AS MonthlySales
+FROM SALES_DATA_1
+GROUP BY EXTRACT(MONTH FROM TO_DATE(INVOICE_DATE, 'DD/MM/YYYY'))
+ORDER BY 1;
+
+## 5.	Revenue Contribution by Payment Method.
+
+WITH CTE1 AS 
+(
+    SELECT PAYMENT_METHOD, SUM(QUANTITY*PRICE) AS INDIVIDUALREVENUE
+    FROM (
+SELECT SALES_DATA_1.CUSTOMER_ID, INVOICE_NO ,INVOICE_DATE, CATEGORY, QUANTITY, PRICE, SHOPPING_MALL, GENDER, AGE, PAYMENT_METHOD
+            FROM CUSTOMER_DATA
+            INNER JOIN SALES_DATA_1
+ON SALES_DATA_1.CUSTOMER_ID = CUSTOMER_DATA.CUSTOMER_ID) TEMP
+    GROUP BY PAYMENT_METHOD),
+CTE2 AS (
+    SELECT SUM(INDIVIDUALREVENUE) AS TOTALREVENUE
+    FROM CTE1)
+SELECT CTE1.PAYMENT_METHOD, ROUND((CTE1.INDIVIDUALREVENUE/CTE2.TOTALREVENUE)*100, 2) AS REVENUE
+FROM CTE1, CTE2;
+
+## 6.	High-value customers for targeted marketing.
+
+SELECT 
+    CUSTOMER_ID, 
+    SUM(QUANTITY*PRICE) AS TotalSpending
+FROM SALES_DATA_1
+GROUP BY CUSTOMER_ID
+HAVING SUM(QUANTITY*PRICE) > 500;
+
+## 7.	Remove invalid sales records with negative amounts.
+
+# Find the negative sales:
+SELECT * FROM 
+SALES_DATA_1
+WHERE PRICE < 1;
+
+
+# If found then delete it:
+DELETE FROM SALES_DATA_1
+WHERE PRICE < 0;
+
+
+## 8.	Average spending by category.
+
+SELECT 
+    CATEGORY, 
+    ROUND(AVG(QUANTITY*PRICE),2) AS AvgSpending
+FROM SALES_DATA_1
+GROUP BY CATEGORY
+ORDER BY 2;
+
+## 9.	Yearly sales trends.
+
+SELECT 
+    EXTRACT(YEAR FROM TO_DATE(INVOICE_DATE, 'DD/MM/YYYY')) AS Year, 
+    SUM(QUANTITY*PRICE) AS YearlySales
+FROM SALES_DATA_1
+GROUP BY EXTRACT(YEAR FROM TO_DATE(INVOICE_DATE, 'DD/MM/YYYY'));
